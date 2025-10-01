@@ -6,3 +6,6 @@ In the 2-genome folder:
 2. Ensembl Mus_musculus gtf (not albinitio) : https://ftp.ensembl.org/pub/release-115/gtf/mus_musculus/Mus_musculus.GRCm39.115.gtf.gz
 
 
+This line is to confirm git pull was done correctly when file edited up on github, not cluster.
+
+
