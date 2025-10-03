@@ -1,6 +1,6 @@
 <ins>02 Oct 2025:</ins>  
 
-##FASTQC
+##QC the FASTQ files of sequenced READS: FASTQC
 Fast QC on cd8_rep3 reads:
 (obds-rnaseq) kell7283@obds:/project/kell7283/linux/2_rnaseq$ fastqc -h #to find which arguments are to be used
 (obds-rnaseq) kell7283@obds:/project/kell7283/linux/2_rnaseq$ fastqc 1_fastq/cd8_rep3_read1.fastq.gz 1_fastq/cd8_rep3_read2.fastq.gz -o 3_analysis/1_fastqc  #running fastqc on both .fastqc.gz files  and output (-o) to 3_analysis/1_fastqc
@@ -46,8 +46,10 @@ fastqc  --nogroup --threads 2 --extract -o  /project/kell7283/linux/2_rnaseq/3_a
 (obds-rnaseq) kell7283@obds:/project/kell7283/linux/2_rnaseq/3_analysis/slurm_output$ less 563_slurm_template.sh.err 
 (obds-rnaseq) kell7283@obds:/project/kell7283/linux/2_rnaseq/3_analysis/slurm_output$ less 563_slurm_template.sh.out
 
+**## MAPPING QC AND QUANTIFICATION:**
 
-##HISAT2 ON SLURM
+## Mapping QCed reads to ref: HISAT2 ON SLURM
+(the reference genome here is grcm39 mouse genome, already downloaded by tutors and stored in shared linux folder (5_rnaseq))
 
 hisat2 --threads 8\
  -x /project/shared/linux/5_rnaseq/hisat2_index/grcm39\
@@ -56,6 +58,225 @@ hisat2 --threads 8\
  --rna-strandness RF\
  --summary-file mapping_stats.txt\
  -S /project/kell7283/linux/2_rnaseq/3_analysis/2_mapping/mapping_cd8_rep3_output.sam
+
+## Convert aligned file (sam) to bam, sort file and index it: using samtools
+[refer to mappingQC_script.sh as below]
+
+samtools view -b /project/kell7283/linux/2_rnaseq/3_analysis/2_mapping/mapping_cd8_rep3_output.sam |
+ samtools sort > /project/kell7283/linux/2_rnaseq/3_analysis/2_mapping/mapping_cd8_rep3_sorted.bam
+
+samtools index /project/kell7283/linux/2_rnaseq/3_analysis/2_mapping/mapping_cd8_rep3_sorted.bam
+
+__jobs: (obds-rnaseq) kell7283@obds:/project/kell7283/linux/2_rnaseq/3_analysis/2_mapping$ sbatch mappingQC_slurm/mappingQC_script.sh 
+      Submitted batch job 648 [wrong pipe usage]__
+
+## Mapping QC: using samtools
+[refer to mapping_samtoolsstats_script.sh]
+
+samtools flagstat /project/kell7283/linux/2_rnaseq/3_analysis/2_mapping/mapping_cd8_rep3_sorted.bam > /project/kell7283/linux/2_rnaseq/3_analysis/2_mapping/ mapping_cd8_rep3_sorted.flagstat
+
+samtools idxstats /project/kell7283/linux/2_rnaseq/3_analysis/2_mapping/mapping_cd8_rep3_sorted.bam > /project/kell7283/linux/2_rnaseq/3_analysis/2_mapping/mapping_cd8_rep3_sorted.idxstats
+
+__(obds-rnaseq) kell7283@obds:/project/kell7283/linux/2_rnaseq/3_analysis/2_mapping/mappingQC_slurm$ sbatch mapping_samtoolsstats_script.sh
+Submitted batch job 681__
+
+## Visualise mapping QC (multiQC)
+
+(obds-rnaseq) kell7283@obds:/project/kell7283/linux/2_rnaseq/3_analysis/mappingQC_reports$ multiqc ../2_mapping/ 
+
+__download with filezilla resultant html and mutliqc_data folders to desktop (moved to onedrive) to view on web browser__
+
+## Generate Feature counts:
+[refer to featureCounts_slurm.sh]
+
+__strand (-s) = 1 = forward__
+featureCounts -T 4 -t exon -g gene_id -p --countReadPairs -s 1 \
+ -a /project/kell7283/linux/2_rnaseq/2_genome/Mus_musculus.GRCm39.115.gtf.gz \
+ -o /project/kell7283/linux/2_rnaseq/3_analysis/featureCounts_reports/cd8_rep3_Fstrand_counts.txt \
+ /project/kell7283/linux/2_rnaseq/3_analysis/2_mapping/mapping_cd8_rep3_sorted.bam
+
+__strand (-s) = 2 = reverse__
+featureCounts -T 4 -t exon -g gene_id -p --countReadPairs -s 2 \
+-a /project/kell7283/linux/2_rnaseq/2_genome/Mus_musculus.GRCm39.115.gtf.gz \
+-o /project/kell7283/linux/2_rnaseq/3_analysis/featureCounts_reports/cd8_rep3_Rstrand_counts.txt \
+ /project/kell7283/linux/2_rnaseq/3_analysis/2_mapping/mapping_cd8_rep3_sorted.bam
+
+
+(obds-rnaseq) kell7283@obds:/project/kell7283/linux/2_rnaseq/3_analysis/2_mapping/mappingQC_slurm$ sbatch featureCounts_slurm.sh
+Submitted batch job <ins>708</ins>  (did not work since it could not find annotation file, since path was not given, just name of file. resultant files deleted to keep it clean)
+
+(obds-rnaseq) kell7283@obds:/project/kell7283/linux/2_rnaseq/3_analysis/2_mapping/mappingQC_slurm$ sbatch featureCounts_slurm.sh     
+Submitted batch job <ins>711</ins> (this is done without s -s = 1 which is wrong since these reads stranded. resultant files have been deleted to keep it clean)
+
+(obds-rnaseq) kell7283@obds:/project/kell7283/linux/2_rnaseq/3_analysis/2_mapping/mappingQC_slurm$ sbatch featureCounts_slurm.sh 
+Submitted batch job <ins>720</ins> (this is done with -s = 1 which is wrong since these reads are on the reverse strand so it showed very little aligned since gener runs on other strand. resultant files have been deleted to keep it clean)
+
+(obds-rnaseq) kell7283@obds:/project/kell7283/linux/2_rnaseq/3_analysis/2_mapping/mappingQC_slurm$ sbatch featureCounts_slurm.sh      
+Submitted batch job <ins>721</ins> (this is the abover detailed sh script (correct way/just use -s=2), with one run for forward strand and one for reverse.)
+
+## Visualising quantification QC
+
+(obds-rnaseq) kell7283@obds:/project/kell7283/linux/2_rnaseq/3_analysis/2_mapping/mappingQC_slurm$ multiqc /project/kell7283/linux/2_rnaseq/3_analysis/featureCounts_reports
+
+## Visualise BAM files on IGV:
+
+downlaod the .bam and indexed .bam.bai files into **one folder** on deskotp (moved to one drive)
+Open IGV, select appropriate genome
+Go to Tracks --> Local files --> select both files in the folder --> Open
+Search for gene or chromosomal locations and look at reads comparisons
+
+## Commit to git:
+
+(obds-rnaseq) kell7283@obds:/project/kell7283/git/obds_linux$ git status
+
+(obds-rnaseq) kell7283@obds:/project/kell7283/git/obds_linux$ git commit -m "Adding rnaseq quantification and QC scripts"
+
+(obds-rnaseq) kell7283@obds:/project/kell7283/git/obds_linux$ git add featureCounts_slurm.sh 
+(obds-rnaseq) kell7283@obds:/project/kell7283/git/obds_linux$ git add mappingQC_script.sh 
+(obds-rnaseq) kell7283@obds:/project/kell7283/git/obds_linux$ git add mapping_samtoolsstats_script.sh 
+
+(obds-rnaseq) kell7283@obds:/project/kell7283/git/obds_linux$ git commit -m "Adding rnaseq quantification and QC scripts"
+
+(obds-rnaseq) kell7283@obds:/project/kell7283/git/obds_linux$ git push                                       
+
+> Also copied the rnaseq_commands.sh into this rnaseq_commands.txt file to have it as a text document instead of a shell script. 
+
+##**Final OBDS cluster <ins>Directory structure</ins>**
+	- /project/kell7283/
+	 - git:
+ 			 - Obds_linux
+ 				- downloads.txt
+ 				- featureCounts_slurm.sh
+ 				- mappingQC_script.sh
+ 				- mapping_samtoolsstats_script.sh
+ 				- mapping_slurm_script.sh
+ 				- README.md
+ 				- rnaseq_commands.sh
+ 				- slurm_template.sh
+		
+		- Linux:
+			§ 1_intro 
+  				□ bed 
+  				□ dnase1.tar.gz 
+  				□ manpage.txt
+			§ 2_rnaseq
+				□ 1_fastq
+ 					- cd8_rep3_read1.fastq.gz 
+ 					- cd8_rep3_read2.fastq.gz 
+ 					- md5sum.txt
+				□ 2_genome 
+ 					- CHECKSUMS 
+ 					- CHECKSUMS_GTF 
+ 					- downloads.txt 
+ 					- Mus_musculus.GRCm39.115.gtf.gz 
+ 					- Mus_musculus.GRCm39.dna.primary_assembly.fa.gz
+				□ 3_analysis
+					- 1_fastqc
+ 						◊ cd8_rep3_read1_fastqc.html  
+ 						◊ cd8_rep3_read1_fastqc.zip  
+ 						◊ cd8_rep3_read2_fastqc.html  
+ 						◊ cd8_rep3_read2_fastqc.zip  
+ 						◊ slurm_template.sh
+					- 2_mapping  
+ 						◊ 648_mappingQC_script.sh.err  
+ 						◊ mapping_cd8_rep3_output.bam  
+ 						◊ mapping_cd8_rep3_sorted.bam      
+ 						◊ mapping_cd8_rep3_sorted.flagstat  
+ 						◊ mappingQC_slurm
+   							} 681_mapping_samtoolsstats_script.sh.err  
+   							} 721_featureCounts_slurm.sh.err  
+   							} featureCounts_slurm.sh  
+   							} mapping_samtoolsstats_script.sh
+   							} 681_mapping_samtoolsstats_script.sh.out  
+   							} 721_featureCounts_slurm.sh.out  
+   							} mappingQC_script.sh
+ 						◊ 648_mappingQC_script.sh.out  
+ 						◊ mapping_cd8_rep3_output.sam  
+ 						◊ mapping_cd8_rep3_sorted.bam.bai  
+ 						◊ mapping_cd8_rep3_sorted.idxstats
+						
+					- 3_feature_counts  
+ 						◊ cd8_rep3_Fstrand_counts.txt  
+ 						◊ cd8_rep3_Fstrand_counts.txt.summary  
+ 						◊ cd8_rep3_Rstrand_counts.txt  
+ 						◊ cd8_rep3_Rstrand_counts.txt.summary
+					- fastqc_slurm  
+ 						◊ 563_slurm_template.sh.err  
+ 						◊ cd8_rep3_read1_fastqc 
+   							} fastqc_data.txt  
+   							} fastqc.fo  
+   							} fastqc_report.html  
+   							} Icons  
+   							} Images  
+   							} summary.txt      
+ 						◊ cd8_rep3_read1_fastqc.zip  
+ 						◊ cd8_rep3_read2_fastqc.html
+ 						◊ 563_slurm_template.sh.out  
+ 						◊ cd8_rep3_read1_fastqc.html  
+ 						◊ cd8_rep3_read2_fastqc     
+   							} fastqc_data.txt  
+   							} fastqc.fo  
+   							} fastqc_report.html  
+   							} Icons  
+   							} Images  
+   							} summary.txt  
+   							} cd8_rep3_read2_fastqc.zip
+					- featureCounts_reports  
+						 ◊ multiqc_data
+   							} featureCounts_assignment_plot.txt  
+   							} multiqc_citations.txt  
+   							} multiqc_featurecounts.txt  
+   							} multiqc.log      
+   							} multiqc_sources.txt
+   							} llms-full.txt                      
+   							} multiqc_data.json      
+   							} multiqc_general_stats.txt  
+   							} multiqc.parquet
+						 ◊ multiqc_report.html
+					- mappingQC_reports
+						 ◊ multiqc_data
+   							} featureCounts_assignment_plot.txt  
+   							} multiqc_citations.txt  
+   							} multiqc_featurecounts.txt  
+   							} multiqc.log      
+   							} multiqc_sources.txt
+   							} llms-full.txt                      
+   							} multiqc_data.json      
+   							} multiqc_general_stats.txt  
+   							} multiqc.parquet
+						 ◊ multiqc_report.html  
+					- mapping_slurm 
+ 						◊ 611_mapping_slurm_script.sh.err  
+ 						◊ 611_mapping_slurm_script.sh.out  
+ 						◊ mapping_slurm_script.sh  
+ 						◊ mapping_stats.txt 
+					- reports  
+					- multiqc_data
+    						} featureCounts_assignment_plot.txt  
+    						} multiqc_citations.txt  
+    						} multiqc_featurecounts.txt  
+    						} multiqc.log      
+    						} multiqc_sources.txt
+    						} llms-full.txt                      
+    						} multiqc_data.json      
+    						} multiqc_general_stats.txt  
+    						} multiqc.parquet
+					- multiqc_report.html  
+					- rnaseq_commands.sh  
+					- rnaseq_commands.sh.save
+			§ file1.txt
+			§ readme.txt
+			§ text.txt
+
+
+
+
+
+
+
+
+
+
 
 
 
